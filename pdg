@@ -38,10 +38,6 @@ from debian import deb822
 __fresh_id = 0
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: pdg PACKAGES_FILE")
-        sys.exit(2)
-
     def get_id():
         global __fresh_id
         __fresh_id += 1
@@ -50,85 +46,124 @@ def main():
     def emit_node(node, dsc):
         print('  "%s" [label="%s"] ;' % (node, dsc))
 
-    def draw_edge(node1, node2, properties):
-        if properties:
-            print(f"\t\"{node1}\" -> \"{node2}\" [{properties}];")
+    def draw_edge(node1, node2, properties, label):
+        props = properties
+
+        if label:
+            if props:
+                props += f",label=\"{label}\""
+            else:
+                props = f"label=\"{label}\""
+
+        if props:
+            print(f"\t\"{node1}\" -> \"{node2}\" [{props}];")
         else:
             print(f"\t\"{node1}\" -> \"{node2}\";")
 
-    def draw_edge_build_depends(node1, node2):
-        draw_edge(node1, node2, "fontcolor=darkgoldenrod,color=darkgoldenrod,style=bold")
+    def draw_edge_build_depends(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=darkgoldenrod,color=darkgoldenrod,style=bold", label)
 
-    def draw_edge_build_depends_indep(node1, node2):
-        draw_edge(node1, node2, "fontcolor=gold,color=gold")
+    def draw_edge_build_depends_indep(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=gold,color=gold", label)
 
-    def draw_edge_pre_depends(node1, node2):
-        draw_edge(node1, node2, "fontcolor=purple,color=purple,style=bold")
+    def draw_edge_pre_depends(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=purple,color=purple,style=bold", label)
 
-    def draw_edge_depends(node1, node2):
-        draw_edge(node1, node2, "fontcolor=blue,color=blue")
+    def draw_edge_depends(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=blue,color=blue", label)
 
-    def draw_edge_recommends(node1, node2):
-        draw_edge(node1, node2, "fontcolor=black,color=black")
+    def draw_edge_recommends(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=black,color=black", label)
 
-    def draw_edge_suggests(node1, node2):
-        draw_edge(node1, node2, "fontcolor=black,color=black,style=dotted")
+    def draw_edge_suggests(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=black,color=black,style=dotted", label)
 
-    def draw_edge_conflicts(node1, node2):
-        draw_edge(node1, node2, "fontcolor=red,color=red")
+    def draw_edge_conflicts(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=red,color=red", label)
 
-    def draw_edge_provides(node1, node2):
-        draw_edge(node1, node2, "fontcolor=green,color=green,arrowhead=inv")
+    def draw_edge_provides(node1, node2, label):
+        draw_edge(node1, node2, "fontcolor=green,color=green,arrowhead=inv", label)
 
-    def print_deps(rels, func):
+    def print_deps(name, rels, func):
         for deps in rels:
             if len(deps) == 1:
-                func(name, deps[0]['name'])
+                func(name, deps[0]['name'], None)
             else:   # output an OR node
                 or_node = get_id()
-                func(name, or_node)
+                func(name, or_node, None)
                 emit_node(or_node, 'OR')
                 for dep in deps:
-                    func(or_node, dep['name'].lower())
+                    func(or_node, dep['name'].lower(), None)
                     # even though it is forbidden by policy, there are some
                     # dependencies with upper case letter in the archive,
                     # apparently apt-get turn them to lowercase ...
 
-    def print_relations(rels):
+    def print_relations(name, rels):
         if 'build-depends' in rels:
-            print_deps(rels['build-depends'], draw_edge_build_depends)
+            print_deps(name, rels['build-depends'], draw_edge_build_depends)
 
         if 'build-depends-indep' in rels:
-            print_deps(rels['build-depends-indep'], draw_edge_build_depends_indep)
+            print_deps(na,e, rels['build-depends-indep'], draw_edge_build_depends_indep)
 
         if 'pre-depends' in rels:
-            print_deps(rels['pre-depends'], draw_edge_pre_depends)
+            print_deps(name, rels['pre-depends'], draw_edge_pre_depends)
 
         if 'depends' in rels:
-            print_deps(rels['depends'], draw_edge_depends)
+            print_deps(name, rels['depends'], draw_edge_depends)
 
         if 'recommends' in rels:
-            print_deps(rels['recommends'], draw_edge_recommends)
+            print_deps(name, rels['recommends'], draw_edge_recommends)
 
         if 'suggests' in rels:
-            print_deps(rels['suggests'], draw_edge_suggests)
+            print_deps(name, rels['suggests'], draw_edge_suggests)
 
         if 'conflicts' in rels:
-            print_deps(rels['conflicts'], draw_edge_conflicts)
+            print_deps(name, rels['conflicts'], draw_edge_conflicts)
 
         if 'provides' in rels:
-            print_deps(rels['provides'], draw_edge_provides)
+            print_deps(name, rels['provides'], draw_edge_provides)
 
+    def print_legend():
+        print("digraph legend {")
+        print("graph [rankdir=LR];")
+        print("node [style=invis];")
+        draw_edge_build_depends(get_id(), get_id(), "Build-Depends")
+        draw_edge_build_depends_indep(get_id(), get_id(), "Build-Depends-Indep")
+        draw_edge_pre_depends(get_id(), get_id(), "Pre-Depends")
+        draw_edge_depends(get_id(), get_id(), "Depends")
+        draw_edge_recommends(get_id(), get_id(), "Recommends")
+        draw_edge_suggests(get_id(), get_id(), "Suggests")
+        draw_edge_conflicts(get_id(), get_id(), "Conflicts")
+        draw_edge_provides(get_id(), get_id(), "Provides")
+        print("}")
 
-    print("digraph dependencies {")
-    print("graph [rankdir=LR];")
-    print("node [shape=box];")
-    for pkg in deb822.Packages.iter_paragraphs(open(sys.argv[1])):
-        name = pkg['package']
-        rels = pkg.relations
-        print_relations(rels)
-    print("}")
+    def print_dependency_graph(filepath):
+        print("digraph dependencies {")
+        print("graph [rankdir=LR];")
+        print("node [shape=box];")
+        for pkg in deb822.Packages.iter_paragraphs(open(sys.argv[2])):
+            name = pkg['package']
+            rels = pkg.relations
+            print_relations(name, rels)
+        print("}")
+
+    def print_usage():
+        print("Usage: pdg options PACKAGES_FILE")
+        print("'pdg g Packages.gz' to get the dependency graph")
+        print("'pdg l Packages.gz' to get the graph of legends")
+
+    if len(sys.argv) != 3:
+        print_usage()
+        sys.exit(1)
+
+    if sys.argv[1] == 'g':
+        print_dependency_graph(sys.argv[2])
+    elif sys.argv[1] == 'l':
+        print_legend()
+    else:
+        print(f"Invalid option '{sys.argv[1]}'")
+        print_usage()
+        sys.exit(2)
 
 if __name__ == '__main__':
     main()
-
